@@ -1078,6 +1078,7 @@
             let isRaid = raidEl ? raidEl.checked : false;
 
             let v1=0, v2=0, v3=0;
+            
             if(slot === "Weapon") {
                 if(isRaid) {
                     v1 = 1966; v2 = 0; v3 = 0; }
@@ -1088,7 +1089,12 @@
                     v1 = 1512; v2 = 756; v3 = 453; }
                     window.currentRaidBonus = null; // Desativa se não for Raid
                 }
-             }
+             } else if (isRaid) {
+                // Valores para ARMADURAS de Raid (Se existirem)
+                v1 = 200; v2 = 200; v3 = 60;
+            } else {
+                // Valores para ITENS NORMAIS (Não Raid)
+                v1 = 756; v2 = 378; v3 = 226;
 
             if(s1 && gearTotal[s1] !== undefined) gearTotal[s1] += v1;
             if(s2 && gearTotal[s2] !== undefined) gearTotal[s2] += v2;
