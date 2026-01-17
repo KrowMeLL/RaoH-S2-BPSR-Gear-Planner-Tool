@@ -1127,20 +1127,35 @@
         let agiVal = parseFloat(document.getElementById('base-agi').value) || 0;
         let agiHaste = agiVal * 0.2;
 
+        // ... (o código anterior da função continua igual até aqui)
+
         finalTotal["Versatility"] += baseVers;
         finalTotal["Mastery"] += baseMast;
         finalTotal["Haste"] += baseHaste + agiHaste;
         finalTotal["Crit"] += baseCrit;
         finalTotal["Luck"] += baseLuck;
 
-        // Atualiza display dos valores brutos
+        // --- CORREÇÃO AQUI: Aplica o bônus de % no STATUS BRUTO (Multiplicador) ---
+        const specialBonus = window.currentRaidBonus;
+        
+        if (specialBonus && specialBonus.type === "percent") {
+            if (specialBonus.label === "Luck") {
+                // Ex: Se tem 1000 de Luck, vira 1110 (1000 + 11%)
+                finalTotal["Luck"] = finalTotal["Luck"] * (1 + (specialBonus.value / 100));
+            }
+            if (specialBonus.label === "Shield (Versatility)") {
+                finalTotal["Versatility"] = finalTotal["Versatility"] * (1 + (specialBonus.value / 100));
+            }
+        }
+
+        // Atualiza display dos valores brutos (Agora já mostrando o valor aumentado)
         document.getElementById("raw-vers").innerText = finalTotal["Versatility"].toFixed(0);
         document.getElementById("raw-mast").innerText = finalTotal["Mastery"].toFixed(0);
         document.getElementById("raw-haste").innerText = finalTotal["Haste"].toFixed(1);
         document.getElementById("raw-crit").innerText = finalTotal["Crit"].toFixed(0);
         document.getElementById("raw-luck").innerText = finalTotal["Luck"].toFixed(0);
 
-        // Calcula as porcentagens (Fórmulas Season 2)
+        // Calcula as porcentagens (Agora usando o valor bruto já buffado)
         let vPct = (finalTotal["Versatility"] / (finalTotal["Versatility"] + 11200)) * 100;
         let mPct = ((finalTotal["Mastery"] / (finalTotal["Mastery"] + 20000)) * 100) + 6;
         let hPct = (finalTotal["Haste"] / (finalTotal["Haste"] + 20000)) * 100;
@@ -1154,9 +1169,8 @@
         document.getElementById('r-crit').innerText = isNaN(cPct) ? "5.00%" : cPct.toFixed(2) + "%";
         document.getElementById('r-luck').innerText = isNaN(lPct) ? "5.00%" : lPct.toFixed(2) + "%";
 
-        // --- EXIBIÇÃO DO BÔNUS DE RAID (Season 2) ---
+        // --- EXIBIÇÃO DO BÔNUS DE RAID (Apenas Texto) ---
         const raidRow = document.getElementById('raid-special-row');
-        const specialBonus = window.currentRaidBonus;
 
         if (specialBonus) {
             raidRow.style.display = 'flex';
@@ -1164,15 +1178,7 @@
             let suffix = specialBonus.type === "percent" ? "%" : "";
             document.getElementById('raid-special-val').innerText = "+" + specialBonus.value + suffix;
             
-            // Aplica bônus nas barras de status (Luck/Versatility)
-            if (specialBonus.label === "Luck") {
-                lPct += specialBonus.value;
-                document.getElementById('r-luck').innerText = lPct.toFixed(2) + "%";
-            }
-            if (specialBonus.label === "Shield (Versatility)") {
-                vPct += specialBonus.value;
-                document.getElementById('r-vers').innerText = vPct.toFixed(2) + "%";
-            }
+            // REMOVEMOS A SOMA DAQUI, POIS JÁ FOI FEITA NO VALOR BRUTO ACIMA
         } else {
             raidRow.style.display = 'none';
         }
