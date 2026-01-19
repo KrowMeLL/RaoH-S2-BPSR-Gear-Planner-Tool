@@ -373,6 +373,18 @@
         { name: "Goblin Guard", slots: ["Bracelet (L)","Bracelet (R)","Charm"], stats: { 1: {Agility:12, Mastery:140}, 2:{}, 3:{} } }
     ];
 
+    // --- NOVA FUNCIONALIDADE: ADICIONAR STATUS AO NOME ---
+    // Itera sobre todos os sigils e adiciona (Status) se tiver apenas 1 status principal
+    SIGIL_DB.forEach(sigil => {
+        const statsAtLvl1 = sigil.stats[1];
+        if (statsAtLvl1) {
+            const statKeys = Object.keys(statsAtLvl1);
+            if (statKeys.length === 1) {
+                sigil.name = `${sigil.name} (${statKeys[0]})`;
+            }
+        }
+    });
+
     const $ = id => document.getElementById(id);
     const createOpt = (val, txt) => `<option value="${val}">${txt || val}</option>`;
 
