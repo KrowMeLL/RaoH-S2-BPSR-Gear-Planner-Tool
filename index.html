@@ -287,13 +287,25 @@
 </div>
 
 <script>
-    // --- 1. DATA CONFIGURATION ---
+    // --- DATA CONFIGURATION ---
     const GAME_DATA = {
         TEXT: { CREDITS: "Produced by Luxxos // Updated by: KrowMeLL / RaoH", NOTES: `<strong>Gear Values:</strong><br>• Raid Weapon: 1966 Primary / 1966 Secondary (No Ref)<br>• Raid Armor: 1512 Primary / 756 Secondary / 453 Reforge<br>• Std Weapon: 756 Primary / 756 Secondary / 226 Reforge<br>• Std Armor: 756 Primary / 378 Secondary / 226 Reforge` },
         STATS: ["Versatility", "Mastery", "Haste", "Crit", "Luck"],
         SLOTS: ["Weapon", "Helmet", "Chest", "Gloves", "Boots", "Earrings", "Necklace", "Ring", "Bracelet (L)", "Bracelet (R)", "Charm"],
         RAID_SLOTS: ["Weapon", "Helmet", "Chest", "Gloves", "Boots", "Bracelet (L)", "Bracelet (R)"],
-        IMAGINE: { TYPES: ["Mastery", "Haste", "Versatility"], VALS: [3584, 4636, 5688, 6740, 7792, 8960] },
+        
+        // --- SEÇÃO DE CONFIGURAÇÃO DOS IMAGINES (NOMES ATUALIZADOS) ---
+        IMAGINE: { 
+            SLOT_IDS: ['1', '2'],
+            OPTIONS: {
+                "Phantom Arachnocrab (Mastery)": { stat: "Mastery", vals: [3584, 4636, 5688, 6740, 7792, 8960] },
+                "Celestial Flier (Haste)": { stat: "Haste", vals: [3584, 4636, 5688, 6740, 7792, 8960] },
+                "Goblin King (Versatility)": { stat: "Versatility", vals: [3584, 4636, 5688, 6740, 7792, 8960] },
+                "Bluespine Lizard (Versatility)": { stat: "Versatility", vals: [2016, 2615, 3214, 3813, 4412, 5040] }
+            }
+        },
+        // -------------------------------------------------------------
+
         LEGENDARY: ["-", "Attack Speed", "Cast Speed", "ATK/MATK", "Dmg Bonus", "Shield", "Healing Output", "Res Break", "All Res", "Armor", "Max HP"],
         RAID_BONUS: {
             "Block": { l: "Luck", v: 6.0, t: "p" }, "Earthfort": { l: "Shield (Vers)", v: 0.0, t: "p" },
@@ -310,7 +322,7 @@
         VALUES: { WEAPON_RAID: { p: 1966, s: 1966, r: 0 }, ARMOR_RAID: { p: 1512, s: 756, r: 453 }, WEAPON_STD: { p: 756, s: 756, r: 226 }, ARMOR_STD: { p: 756, s: 378, r: 226 } }
     };
 
-    // --- SIGIL DATABASE (Fixed: All base stats in Level 1) ---
+    // --- SIGIL DATABASE ---
     const SIGIL_DB = [
         // Weapon
         { name: "Basilisk Sigil (Legendary)", slots: ["Weapon"], stats: { 1: {"All Element Attack": 70}, 2: {}, 3: {} } },
@@ -367,9 +379,15 @@
             $('dynamic-footer-note').innerHTML = GAME_DATA.TEXT.NOTES;
             $('class-spec').innerHTML = Object.keys(GAME_DATA.SPECS).map(s => createOpt(s)).join('');
             
-            ['1', '2'].forEach(n => {
-                $(`img-type-${n}`).innerHTML = createOpt("", "- None -") + GAME_DATA.IMAGINE.TYPES.map(t => createOpt(t, `Img (${t})`)).join('');
-                $(`img-lvl-${n}`).innerHTML = GAME_DATA.IMAGINE.VALS.map((v, i) => createOpt(v, `Lv ${i} (+${v})`)).join('');
+            // Gerar Options para os Imagines
+            const imgOptions = Object.keys(GAME_DATA.IMAGINE.OPTIONS);
+            GAME_DATA.IMAGINE.SLOT_IDS.forEach(n => {
+                // Preenche o Select de Tipos
+                $(`img-type-${n}`).innerHTML = createOpt("", "- None -") + imgOptions.map(k => createOpt(k, k)).join('');
+                // Preenche o Select de Niveis (apenas T0, T1..., o valor depende do tipo escolhido)
+                let lvlHtml = "";
+                for(let i=0; i<6; i++) lvlHtml += createOpt(i, `Tier ${i}`); // Value é o Index (0 a 5)
+                $(`img-lvl-${n}`).innerHTML = lvlHtml;
             });
 
             // Generate Grid
@@ -377,8 +395,6 @@
             container.innerHTML = GAME_DATA.SLOTS.map((slot, i) => {
                 const isRaidSlot = GAME_DATA.RAID_SLOTS.includes(slot);
                 const raidCheck = isRaidSlot ? `<input type="checkbox" id="raid-${i}" onchange="ui.toggleRaid(${i}, '${slot}')">` : '';
-                
-                // Filter Sigils for this slot
                 const slotSigils = SIGIL_DB.filter(s => s.slots.includes(slot));
                 const sigilOpts = `<option value="">-</option>` + slotSigils.map(s => createOpt(s.name)).join('');
 
@@ -516,10 +532,17 @@
                 }
             });
 
-            // 3. Imagines
-            ['1','2'].forEach(n => {
-                const t = $(`img-type-${n}`).value;
-                if(t) total[t] += parseInt($(`img-lvl-${n}`).value)||0;
+            // 3. Imagines (Updated Logic for multiple types)
+            GAME_DATA.IMAGINE.SLOT_IDS.forEach(n => {
+                const typeKey = $(`img-type-${n}`).value;
+                const lvlIdx = parseInt($(`img-lvl-${n}`).value); // Now returns 0-5
+                
+                if(typeKey && !isNaN(lvlIdx)) {
+                    const imgData = GAME_DATA.IMAGINE.OPTIONS[typeKey];
+                    if(imgData) {
+                        total[imgData.stat] += imgData.vals[lvlIdx];
+                    }
+                }
             });
 
             // 4. Agility to Haste Conversion (Fixed: 0.45)
@@ -566,7 +589,7 @@
         }
     };
 
-    // --- OPTIMIZER (Simplified) ---
+    // --- OPTIMIZER (Updated for new Imagine Structure) ---
     const optimizer = {
         run: () => {
             const targets = {
@@ -575,7 +598,7 @@
             };
             const ctx = {
                 bV: parseFloat($('base-vers').value)||0, bM: parseFloat($('base-mast').value)||0,
-                bH: (parseFloat($('base-haste').value)||0) + ((parseFloat($('opt-agi').value)||0)*0.45), // Fixed ratio
+                bH: (parseFloat($('base-haste').value)||0) + ((parseFloat($('opt-agi').value)||0)*0.45),
                 bC: parseFloat($('base-crit').value)||0, bL: parseFloat($('base-luck').value)||0,
                 spec: $('class-spec').value, bonus: GAME_DATA.RAID_BONUS[$('class-spec').value]
             };
@@ -610,7 +633,11 @@
         },
         calc: (layout, ctx) => {
             let raw = { Versatility: ctx.bV, Mastery: ctx.bM, Haste: ctx.bH, Crit: ctx.bC, Luck: ctx.bL };
-            layout.img.forEach(im => { if(im.t) raw[im.t] += im.v; });
+            // Calc Imagines based on stored Keys and Index
+            layout.img.forEach(im => { 
+                const data = GAME_DATA.IMAGINE.OPTIONS[im.key];
+                if(data) raw[data.stat] += data.vals[im.idx];
+            });
             layout.gear.forEach((g, i) => {
                 if(!g) return;
                 let vals = (i===0 && g.raid) ? GAME_DATA.VALUES.WEAPON_RAID : (i===0) ? GAME_DATA.VALUES.WEAPON_STD : g.raid ? GAME_DATA.VALUES.ARMOR_RAID : GAME_DATA.VALUES.ARMOR_STD;
@@ -658,8 +685,20 @@
                 }
                 layout.gear[i] = { raid: isRaid, p, s, r, locked: false };
             });
-            if(optImg) layout.img = [0,1].map(() => ({ t: GAME_DATA.IMAGINE.TYPES[Math.floor(Math.random()*3)], v: 3584 })); 
-            else layout.img = [1,2].map(n => ({ t: $(`img-type-${n}`).value, v: parseInt($(`img-lvl-${n}`).value)||0 }));
+            
+            // Generate Imagines (Key + Index)
+            const keys = Object.keys(GAME_DATA.IMAGINE.OPTIONS);
+            if(optImg) {
+                layout.img = GAME_DATA.IMAGINE.SLOT_IDS.map(() => ({ 
+                    key: keys[Math.floor(Math.random()*keys.length)], 
+                    idx: Math.floor(Math.random()*6) 
+                }));
+            } else {
+                layout.img = GAME_DATA.IMAGINE.SLOT_IDS.map(n => ({ 
+                    key: $(`img-type-${n}`).value, 
+                    idx: parseInt($(`img-lvl-${n}`).value)||0 
+                }));
+            }
             return layout;
         },
         mutate: (l, build, optImg) => {
@@ -680,9 +719,11 @@
                 if(!(idx===0 && g.raid)) g.r = GAME_DATA.STATS[Math.floor(Math.random()*5)];
             }
             if(optImg && Math.random() < 0.1) {
-                let im = l.img[Math.floor(Math.random()*2)];
-                if(Math.random()<0.5) im.t = GAME_DATA.IMAGINE.TYPES[Math.floor(Math.random()*3)];
-                else im.v = GAME_DATA.IMAGINE.VALS[Math.floor(Math.random()*6)];
+                // Mutate Imagine
+                const keys = Object.keys(GAME_DATA.IMAGINE.OPTIONS);
+                let im = l.img[Math.floor(Math.random()*l.img.length)];
+                if(Math.random()<0.5) im.key = keys[Math.floor(Math.random()*keys.length)];
+                else im.idx = Math.floor(Math.random()*6);
             }
         },
         apply: (l) => {
@@ -692,8 +733,13 @@
                 $(`s2-${i}`).value = g.s; $(`s3-${i}`).value = g.r;
             });
             if(l.img.length) {
-                $(`img-type-1`).value = l.img[0].t; $(`img-lvl-1`).value = l.img[0].v;
-                $(`img-type-2`).value = l.img[1].t; $(`img-lvl-2`).value = l.img[1].v;
+                l.img.forEach((im, i) => {
+                    const n = GAME_DATA.IMAGINE.SLOT_IDS[i];
+                    if(n) {
+                        $(`img-type-${n}`).value = im.key; 
+                        $(`img-lvl-${n}`).value = im.idx;
+                    }
+                });
             }
         }
     };
