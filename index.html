@@ -51,7 +51,8 @@
         /* CONTROLES */
         .controls-row {
             background: #1c1e26; padding: 20px; border-radius: var(--radius); 
-            display: flex; flex-direction: column; align-items: center; gap: 15px; 
+            display: flex; flex-direction: column; align-items: center; 
+            gap: 25px; /* Aumentado o espaçamento aqui */
             margin-bottom: 20px; border: var(--border);
         }
         
@@ -70,7 +71,13 @@
             box-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
         }
 
-        .spec-wrapper { display: flex; align-items: center; gap: 10px; margin-top: 5px; }
+        /* Ajuste de centralização e separação */
+        .spec-wrapper { 
+            display: flex; align-items: center; justify-content: center; 
+            gap: 15px; width: 100%; 
+            padding-top: 10px;
+            border-top: 1px solid #333; /* Linha sutil para separar */
+        }
 
         /* INPUTS */
         select, input[type="number"] { 
@@ -143,9 +150,9 @@
 
         .btn-clear {
             background: var(--highlight); color: #fff; border: none;
-            padding: 6px 10px; border-radius: var(--radius); cursor: pointer;
+            padding: 6px 14px; border-radius: var(--radius); cursor: pointer;
             font-size: 0.75em; font-weight: bold; margin-left: 5px;
-            text-transform: uppercase;
+            text-transform: uppercase; letter-spacing: 1px;
         }
         .btn-clear:hover { background: #c0392b; }
 
@@ -208,7 +215,7 @@
                         <option value="2">2</option>
                         <option value="3">3</option>
                     </select>
-                    <button class="btn-clear" onclick="logic.clearSigils()">Clear</button>
+                    <button class="btn-clear" onclick="logic.clearAll()">Clear All</button>
                 </div>
             </div>
 
@@ -517,12 +524,40 @@
             logic.calculate();
         },
 
-        clearSigils: () => {
+        clearAll: () => {
              GAME_DATA.SLOTS.forEach((_, i) => {
+                 // Reset Raid
+                 const raidCheck = $(`raid-${i}`);
+                 if(raidCheck) {
+                     raidCheck.checked = false;
+                     ui.toggleRaid(i); // This re-enables inputs
+                 }
+
+                 // Reset Stats
+                 $(`s1-${i}`).value = "";
+                 $(`s2-${i}`).value = "";
+                 $(`s3-${i}`).value = "";
+                 logic.updateRow(i); // Refresh options logic
+
+                 // Reset Sigils
                  $(`sigil-name-${i}`).value = "";
                  $(`sigil-lvl-${i}`).value = "1";
+
+                 // Reset Legendary
+                 $(`leg-type-${i}`).value = "-";
+                 $(`leg-val-${i}`).value = "";
              });
-             $('global-sigil-lvl').value = ""; // Reset global
+
+             // Reset Imagine
+             GAME_DATA.IMAGINE.SLOT_IDS.forEach(n => {
+                $(`img-type-${n}`).value = "";
+                $(`img-lvl-${n}`).value = "0";
+             });
+
+             // Reset Globals
+             $('global-sigil-lvl').value = "";
+
+             // Recalculate
              logic.calculate();
         },
 
