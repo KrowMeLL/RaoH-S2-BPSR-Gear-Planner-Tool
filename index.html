@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gear Stat Planner | Level 140 (Squished)</title>
+    <title>Gear Stat Planner | Level 140 (Diminishing Returns Fixed)</title>
     <style>
         /* =========================================
            THEME: MIDNIGHT GOLD (REFINED)
@@ -236,7 +236,7 @@
         <div id="tab-opt" class="content">
             <div class="opt-panel">
                 <div style="text-align:center; color:#888; margin-bottom:20px; font-size:0.9rem; font-style:italic;">
-                    Define your target percentages. The system will simulate thousands of combinations.
+                    Define your target percentages. The system will simulate thousands of combinations using the squished stat curve.
                 </div>
                 <div class="opt-grid">
                     <div class="opt-item"><label>Target Vers %</label><input type="number" id="o-v" placeholder="0"></div>
@@ -332,10 +332,7 @@
             
             <div id="xtra" style="margin-top:20px; border-top:1px dashed #444; padding-top:15px;"></div>
             
-            <div id="leg-sum" style="display:none; margin-top:15px; border-top:1px solid #333; padding-top:10px;">
-                <div class="stat-row"><span>Cast Speed:</span><span id="l-cs" style="color:var(--gold)">0%</span></div>
-                <div class="stat-row"><span>Atk Speed:</span><span id="l-as" style="color:var(--gold)">0%</span></div>
-            </div>
+            <div id="leg-sum" style="display:none; margin-top:15px; border-top:1px solid #333; padding-top:10px;"></div>
         </div>
     </div>
 </div>
@@ -354,7 +351,7 @@ const CFG = {
         W_STD:  { p: 1512,  s: 756,  r: 453 }, A_STD:  { p: 756,  s: 378, r: 226 }
     },
     
-    // TABELA BASEADA NA IMAGEM DE REFERÊNCIA (Season 2 Squished)
+    // TABELA BASEADA NA IMAGEM DE REFERÊNCIA (Diminishing Returns)
     TIERS: {
         "Versatility": [[0,0], [589,5], [1244,10], [1976,15], [2800,20], [3733,25], [4800,30], [6031,35], [7467,40], [9164,45], [11200,50], [13689,55], [16800,60], [20800,65], [26133,70], [33600,75], [44800,80]],
         "Mastery":     [[0,6], [832,10], [1976,15], [3252,20], [4685,25], [6308,30], [8159,35], [10290,40], [12771,45], [15695,50], [19192,55], [23449,60], [28745,65], [35511,70], [44460,75], [56852,80]],
@@ -894,8 +891,16 @@ const calc = {
         Object.entries(xtra).forEach(([k,v]) => { if(v>0) xh+=`<div class="stat-row"><span>${k}:</span><span class="val">+${v}</span></div>`; });
         $('xtra').innerHTML = xh;
 
-        $('leg-sum').style.display = (leg["Attack Speed"]>0||leg["Cast Speed"]>0)?'block':'none';
-        $('l-cs').innerText = `+${leg["Cast Speed"]}%`; $('l-as').innerText = `+${leg["Attack Speed"]}%`;
+        // DYNAMIC LEGENDARY SUMMARY DISPLAY (Fix applied here)
+        let legHTML = "";
+        if (leg["Cast Speed"] > 0) {
+            legHTML += `<div class="stat-row"><span>Cast Speed:</span><span style="color:var(--gold)">+${leg["Cast Speed"]}%</span></div>`;
+        }
+        if (leg["Attack Speed"] > 0) {
+            legHTML += `<div class="stat-row"><span>Atk Speed:</span><span style="color:var(--gold)">+${leg["Attack Speed"]}%</span></div>`;
+        }
+        $('leg-sum').innerHTML = legHTML;
+        $('leg-sum').style.display = legHTML ? 'block' : 'none';
     }
 };
 
