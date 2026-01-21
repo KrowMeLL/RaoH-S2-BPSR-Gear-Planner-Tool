@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>BPSR | GEAR STAT PLANNER | LEVEL 140</title>
+    <title>BPSR | GEAR STAT PLANNER | LEVEL 140 (Optimized)</title>
     <style>
         /* =========================================
            VISUAL THEME: MIDNIGHT GOLD (LEVEL 140)
@@ -11,14 +11,10 @@
             --bg-body: #0f1014;
             --bg-panel: #181a21;
             --bg-input: #0b0c10;
-            
-            /* Theme: Gold (#d4af37) */
             --accent: #d4af37;        
             --accent-hover: #f1c40f;
-            
-            --primary: #3498db;       /* Blue */
-            --highlight: #e74c3c;     /* Red (kept from 140 original for Agility text etc) */
-            
+            --primary: #3498db;
+            --highlight: #e74c3c;
             --text-main: #ecf0f1;
             --text-muted: #7f8c8d;
             --border: 1px solid #2c3e50;
@@ -145,6 +141,14 @@
         .btn-blue { background: var(--primary); }
         .btn-blue:hover, .btn-gold:hover { filter: brightness(1.1); transform: translateY(-2px); }
 
+        .btn-clear {
+            background: var(--highlight); color: #fff; border: none;
+            padding: 6px 10px; border-radius: var(--radius); cursor: pointer;
+            font-size: 0.75em; font-weight: bold; margin-left: 5px;
+            text-transform: uppercase;
+        }
+        .btn-clear:hover { background: #c0392b; }
+
         .opt-input-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
         .opt-input-group label { color: var(--accent); font-size: 0.8em; font-weight: bold; display: block; margin-bottom: 5px; text-transform: uppercase; }
         .opt-options { display: flex; justify-content: center; gap: 20px; margin-top: 20px; flex-wrap: wrap; background: #1c1e26; padding: 15px; border-radius: var(--radius); }
@@ -166,8 +170,8 @@
         <h2>BPSR | GEAR STAT PLANNER | LEVEL 140</h2>
         
         <div class="tab-container">
-            <button class="tab-btn active" onclick="ui.switchTab('planner')">Manual Planner</button>
-            <button class="tab-btn" onclick="ui.switchTab('optimizer')">Auto-Optimizer</button>
+            <button class="tab-btn active" onclick="ui.switchTab('planner', this)">Manual Planner</button>
+            <button class="tab-btn" onclick="ui.switchTab('optimizer', this)">Auto-Optimizer</button>
         </div>
 
         <div class="controls-row">
@@ -197,13 +201,14 @@
                 </div>
                 
                 <div class="global-group">
-                    <span style="color:var(--primary); font-weight:bold;">Set Sigil Lvl:</span>
-                    <select onchange="logic.applyGlobal('sigil-lvl', this.value)" style="width:80px;">
+                    <span style="color:var(--accent); font-weight:bold;">Set Sigil Lvl:</span>
+                    <select id="global-sigil-lvl" onchange="logic.applyGlobal('sigil-lvl', this.value)" style="width:80px;">
                         <option value="">-</option>
                         <option value="1">1</option>
                         <option value="2">2</option>
                         <option value="3">3</option>
                     </select>
+                    <button class="btn-clear" onclick="logic.clearSigils()">Clear</button>
                 </div>
             </div>
 
@@ -284,7 +289,7 @@
             <div class="result-row"><span>Luck:</span> <span class="result-val" id="r-luck">5.00%</span></div>
             
             <div id="extra-bonuses" style="margin-top:15px; border-top:1px dashed #444; padding-top:10px;">
-                </div>
+            </div>
             
             <div id="legendary-summary" style="display:none; margin-top:15px; font-size:0.9em; border-top:1px solid #333; padding-top:10px;">
             </div>
@@ -341,7 +346,6 @@
     };
 
     // --- SIGIL DATABASE (LEVEL 140 VALUES) ---
-    // Structure updated to match 160 Logic (n/s/d) but keeping 140 stats
     const SIGIL_DB = [
         { n: "Basilisk Sigil", s: ["Weapon"], d: { 1: {"All Element Attack": 40}, 2: {"All Element Attack": 45}, 3: {"All Element Attack": 50} } },
         { n: "Bluespine Lizard", s: ["Weapon"], d: { 1: {"All Element Attack": 20}, 2: {"All Element Attack": 25}, 3: {"All Element Attack": 30} } },
@@ -382,11 +386,15 @@
 
     const $ = id => document.getElementById(id);
     const createOpt = (val, txt) => `<option value="${val}">${txt || val}</option>`;
+    
+    // Optimizing Sigil Lookup
+    const SIGIL_MAP = new Map();
 
-    // Auto-rename sigils (Feature from 140 code)
+    // Auto-rename sigils and Index them
     SIGIL_DB.forEach(s => {
         const k = Object.keys(s.d[1]);
         if(k.length === 1 && !s.n.includes("(")) s.n += ` (${k[0]})`;
+        SIGIL_MAP.set(s.n, s);
     });
 
     // --- UI CONTROLLER ---
@@ -400,7 +408,6 @@
             GAME_DATA.IMAGINE.SLOT_IDS.forEach(n => {
                 $(`img-type-${n}`).innerHTML = createOpt("", "- None -") + imgOptions.map(k => createOpt(k, k)).join('');
                 let lvlHtml = "";
-                // Tiers 0 to 5 generated here
                 for(let i=0; i<6; i++) lvlHtml += createOpt(i, `Tier ${i}`);
                 $(`img-lvl-${n}`).innerHTML = lvlHtml;
             });
@@ -409,9 +416,7 @@
             container.innerHTML = GAME_DATA.SLOTS.map((slot, i) => {
                 const isRaidSlot = GAME_DATA.RAID_SLOTS.includes(slot);
                 const raidCheck = isRaidSlot ? `<input type="checkbox" id="raid-${i}" onchange="ui.toggleRaid(${i}, '${slot}')">` : '';
-                // Updated filter to check against new 's' property
                 const slotSigils = SIGIL_DB.filter(s => s.s.includes(slot));
-                // Updated map to use new 'n' property
                 const sigilOpts = `<option value="">-</option>` + slotSigils.map(s => createOpt(s.n)).join('');
 
                 return `
@@ -436,11 +441,11 @@
             logic.updateAll();
         },
 
-        switchTab: (tab) => {
+        switchTab: (tab, btn) => {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
             $(`tab-${tab}`).classList.add('active');
-            event.target.classList.add('active');
+            if(btn) btn.classList.add('active');
         },
 
         toggleRaid: (idx) => {
@@ -466,8 +471,11 @@
 
             if(isRaid) {
                 const specs = GAME_DATA.SPECS[$('class-spec').value];
-                s1.innerHTML = createOpt(specs[0]); s1.value = specs[0]; s1.disabled = true;
-                s2.innerHTML = createOpt(specs[1]); s2.value = specs[1]; s2.disabled = true;
+                // Reuse existing function to prevent thrashing if value matches
+                logic.fillSelect(s1, specs[0], null, false, [], true); 
+                logic.fillSelect(s2, specs[1], null, false, [], true);
+                s1.disabled = true; s2.disabled = true;
+                
                 s3.disabled = (slot === "Weapon");
                 if(slot === "Weapon") s3.value = ""; else logic.fillSelect(s3, s3.value, null, false);
             } else {
@@ -479,11 +487,25 @@
             }
         },
 
-        fillSelect: (el, curr, excl, restricted, banned=[]) => {
-            el.innerHTML = '<option value="">-</option>' + GAME_DATA.STATS
-                .filter(s => (!restricted || !banned.includes(s)) && s !== excl)
-                .map(s => createOpt(s)).join('');
-            el.value = (curr && Array.from(el.options).some(o=>o.value===curr)) ? curr : "";
+        fillSelect: (el, curr, excl, restricted, banned=[], forceVal=false) => {
+            const opts = GAME_DATA.STATS
+                .filter(s => (!restricted || !banned.includes(s)) && s !== excl);
+            
+            // Optimization: Only rebuild HTML if options length changed significantly or first load
+            // For simplicitly here, we just rebuild strings but check value retention
+            const html = '<option value="">-</option>' + opts.map(s => `<option value="${s}">${s}</option>`).join('');
+            
+            if (el.innerHTML !== html) {
+                el.innerHTML = html;
+            }
+            
+            if (forceVal) {
+                el.value = curr;
+            } else {
+                // Keep current value if valid in new list, else reset
+                if (curr && opts.includes(curr)) el.value = curr;
+                else if (el.value !== "" && !opts.includes(el.value)) el.value = "";
+            }
         },
 
         applyGlobal: (type, val) => {
@@ -495,223 +517,309 @@
             logic.calculate();
         },
 
+        clearSigils: () => {
+             GAME_DATA.SLOTS.forEach((_, i) => {
+                 $(`sigil-name-${i}`).value = "";
+                 $(`sigil-lvl-${i}`).value = "1";
+             });
+             $('global-sigil-lvl').value = ""; // Reset global
+             logic.calculate();
+        },
+
         // --- CURVE LOGIC ---
         getStatPercent: (stat, val) => {
             const tiers = GAME_DATA.TIERS[stat];
             if (!tiers || val <= 0) return tiers[0][1];
             if (val >= tiers[tiers.length-1][0]) return tiers[tiers.length-1][1];
 
+            // Linear scan is fast enough for 15 items
             for (let i = 0; i < tiers.length - 1; i++) {
-                let [v1, p1] = tiers[i];
-                let [v2, p2] = tiers[i+1];
-                if (val >= v1 && val < v2) {
-                    return p1 + (val - v1) / (v2 - v1) * (p2 - p1);
+                if (val >= tiers[i][0] && val < tiers[i+1][0]) {
+                     const [v1, p1] = tiers[i];
+                     const [v2, p2] = tiers[i+1];
+                     return p1 + (val - v1) / (v2 - v1) * (p2 - p1);
                 }
             }
             return 0;
         },
 
-        calculate: () => {
-            const total = { Versatility:0, Mastery:0, Haste:0, Crit:0, Luck:0 };
-            const leg = { "Attack Speed":0, "Cast Speed":0 };
-            const spec = $('class-spec').value;
-            let raidBonus = null;
-            let extraStats = {};
-
-            // 1. Base Stats
-            total.Versatility += parseFloat($('base-vers').value)||0;
-            total.Mastery += parseFloat($('base-mast').value)||0;
-            total.Haste += parseFloat($('base-haste').value)||0;
-            total.Crit += parseFloat($('base-crit').value)||0;
-            total.Luck += parseFloat($('base-luck').value)||0;
-            let baseAgi = parseFloat($('base-agi').value)||0;
-
-            // 2. Gear & Sigils
+        // Separation of concerns: Fetch UI data -> Calc -> Update UI
+        getLayoutFromUI: () => {
+            const layout = { gear: [], img: [] };
             GAME_DATA.SLOTS.forEach((slot, i) => {
-                const [p, s, r] = [`s1-${i}`, `s2-${i}`, `s3-${i}`].map(id => $(id).value);
                 const isRaid = $(`raid-${i}`)?.checked;
-                let v = (slot === "Weapon") ? (isRaid ? GAME_DATA.VALUES.WEAPON_RAID : GAME_DATA.VALUES.WEAPON_STD) : (isRaid ? GAME_DATA.VALUES.ARMOR_RAID : GAME_DATA.VALUES.ARMOR_STD);
-                if(slot === "Weapon" && isRaid) raidBonus = GAME_DATA.RAID_BONUS[spec];
-
-                if(p) total[p] += v.p;
-                if(s) total[s] += v.s;
-                if(r) total[r] += v.r;
-
-                if(!isRaid) {
-                    const lType = $(`leg-type-${i}`).value;
-                    const lVal = parseFloat($(`leg-val-${i}`).value)||0;
-                    if(leg[lType] !== undefined) leg[lType] += lVal;
-                }
-
-                // Process Sigil
                 const sigName = $(`sigil-name-${i}`).value;
                 const sigLvl = $(`sigil-lvl-${i}`).value;
-                if(sigName) {
-                    const sigData = SIGIL_DB.find(x => x.n === sigName);
-                    if(sigData && sigData.d[sigLvl]) {
-                        for (const [stat, val] of Object.entries(sigData.d[sigLvl])) {
-                            if(total[stat] !== undefined) {
-                                total[stat] += val;
-                            } else if (stat === "Agility") {
-                                baseAgi += val; 
-                                if(!extraStats["Agility"]) extraStats["Agility"] = 0;
-                                extraStats["Agility"] += val;
-                            } else {
-                                if(!extraStats[stat]) extraStats[stat] = 0;
-                                extraStats[stat] += val;
+                const legType = !isRaid ? $(`leg-type-${i}`).value : "-";
+                const legVal = !isRaid ? (parseFloat($(`leg-val-${i}`).value)||0) : 0;
+                
+                layout.gear.push({
+                    raid: isRaid,
+                    p: $(`s1-${i}`).value,
+                    s: $(`s2-${i}`).value,
+                    r: $(`s3-${i}`).value,
+                    sigName, sigLvl, legType, legVal
+                });
+            });
+            
+            GAME_DATA.IMAGINE.SLOT_IDS.forEach(n => {
+                layout.img.push({
+                    key: $(`img-type-${n}`).value,
+                    idx: parseInt($(`img-lvl-${n}`).value)
+                });
+            });
+            return layout;
+        },
+
+        calculate: () => {
+            const layout = logic.getLayoutFromUI();
+            const spec = $('class-spec').value;
+            const baseStats = {
+                v: parseFloat($('base-vers').value)||0,
+                m: parseFloat($('base-mast').value)||0,
+                h: parseFloat($('base-haste').value)||0,
+                c: parseFloat($('base-crit').value)||0,
+                l: parseFloat($('base-luck').value)||0,
+                agi: parseFloat($('base-agi').value)||0
+            };
+
+            const result = logic.calculateStatsInternal(layout, spec, baseStats);
+            logic.renderStats(result);
+        },
+
+        // Pure calculation function (No DOM interaction) - heavily optimized for the loop
+        calculateStatsInternal: (layout, spec, baseStats) => {
+            const total = { Versatility: baseStats.v, Mastery: baseStats.m, Haste: baseStats.h, Crit: baseStats.c, Luck: baseStats.l };
+            let baseAgi = baseStats.agi;
+            let extraStats = {};
+            const leg = { "Attack Speed":0, "Cast Speed":0 };
+            
+            const raidBonus = GAME_DATA.RAID_BONUS[spec];
+
+            // Gear & Sigils
+            for (let i = 0; i < layout.gear.length; i++) {
+                const g = layout.gear[i];
+                if (!g) continue;
+
+                const v = (i === 0) ? (g.raid ? GAME_DATA.VALUES.W_RAID : GAME_DATA.VALUES.W_STD) : (g.raid ? GAME_DATA.VALUES.A_RAID : GAME_DATA.VALUES.A_STD);
+
+                if(g.p) total[g.p] += v.p;
+                if(g.s) total[g.s] += v.s;
+                if(g.r) total[g.r] += v.r;
+
+                if (g.legType && leg[g.legType] !== undefined) {
+                    leg[g.legType] += g.legVal;
+                }
+
+                if (g.sigName) {
+                    const sigData = SIGIL_MAP.get(g.sigName);
+                    if(sigData && sigData.d[g.sigLvl]) {
+                        for (const k in sigData.d[g.sigLvl]) {
+                            const val = sigData.d[g.sigLvl][k];
+                            if(total[k] !== undefined) total[k] += val;
+                            else if(k === "Agility") {
+                                baseAgi += val;
+                                extraStats["Agility"] = (extraStats["Agility"] || 0) + val;
                             }
+                            else extraStats[k] = (extraStats[k] || 0) + val;
                         }
                     }
                 }
-            });
+            }
 
-            // 3. Imagines
-            GAME_DATA.IMAGINE.SLOT_IDS.forEach(n => {
-                const typeKey = $(`img-type-${n}`).value;
-                const lvlIdx = parseInt($(`img-lvl-${n}`).value);
-                if(typeKey && !isNaN(lvlIdx)) {
-                    const imgData = GAME_DATA.IMAGINE.OPTIONS[typeKey];
-                    if(imgData) total[imgData.stat] += imgData.vals[lvlIdx];
+            // Imagines
+            for (let i = 0; i < layout.img.length; i++) {
+                const im = layout.img[i];
+                if(im.key && !isNaN(im.idx)) {
+                    const imgData = GAME_DATA.IMAGINE.OPTIONS[im.key];
+                    if(imgData) total[imgData.stat] += imgData.vals[im.idx];
                 }
-            });
+            }
 
-            // 4. Agility to Haste Conversion
+            // Agility
             total.Haste += (baseAgi * 0.45);
 
-            // 5. Percent Bonuses
-            if(raidBonus && raidBonus.t === 'p') {
+            // Raid Bonus
+            let appliedBonus = null;
+            if (layout.gear[0] && layout.gear[0].raid && raidBonus && raidBonus.t === 'p') {
                 if(raidBonus.l === "Luck") total.Luck *= (1 + raidBonus.v/100);
                 if(raidBonus.l.includes("Shield")) total.Versatility *= (1 + raidBonus.v/100);
+                appliedBonus = raidBonus;
             }
 
+            return { total, leg, extraStats, appliedBonus };
+        },
+
+        renderStats: (res) => {
             // Display Raw
-            ['vers','mast','haste','crit','luck'].forEach((k,i) => $(`raw-${k}`).innerText = total[GAME_DATA.STATS[i]].toFixed(0));
+            ['vers','mast','haste','crit','luck'].forEach((k,i) => $(`raw-${k}`).innerText = res.total[GAME_DATA.STATS[i]].toFixed(0));
 
-            // Display Final (Using Curve Logic)
-            $('r-vers').innerText = logic.getStatPercent("Versatility", total.Versatility).toFixed(2) + "%";
-            $('r-mast').innerText = logic.getStatPercent("Mastery", total.Mastery).toFixed(2) + "%";
-            $('r-haste').innerText = logic.getStatPercent("Haste", total.Haste).toFixed(2) + "%";
-            $('r-crit').innerText = logic.getStatPercent("Crit", total.Crit).toFixed(2) + "%";
-            $('r-luck').innerText = logic.getStatPercent("Luck", total.Luck).toFixed(2) + "%";
+            // Display Final
+            $('r-vers').innerText = logic.getStatPercent("Versatility", res.total.Versatility).toFixed(2) + "%";
+            $('r-mast').innerText = logic.getStatPercent("Mastery", res.total.Mastery).toFixed(2) + "%";
+            $('r-haste').innerText = logic.getStatPercent("Haste", res.total.Haste).toFixed(2) + "%";
+            $('r-crit').innerText = logic.getStatPercent("Crit", res.total.Crit).toFixed(2) + "%";
+            $('r-luck').innerText = logic.getStatPercent("Luck", res.total.Luck).toFixed(2) + "%";
 
-            // Extras Display
+            // Extras
             let extraHTML = `<div style="color:var(--highlight); font-weight:bold; margin-bottom:8px; border-bottom:1px solid #333; padding-bottom:3px;">Extra Bonuses</div>`;
-            if(raidBonus) {
-                let valStr = `+${raidBonus.v}${raidBonus.t === 'p' ? '%' : ''}`;
-                extraHTML += `<div style="color:var(--text-main); font-size:0.9em; display:flex; justify-content:space-between; margin-bottom:4px;"><span>Raid ${raidBonus.l}:</span> <span style="color:var(--accent); font-weight:bold;">${valStr}</span></div>`;
+            if(res.appliedBonus) {
+                let valStr = `+${res.appliedBonus.v}%`;
+                extraHTML += `<div style="color:var(--text-main); font-size:0.9em; display:flex; justify-content:space-between; margin-bottom:4px;"><span>Raid ${res.appliedBonus.l}:</span> <span style="color:var(--accent); font-weight:bold;">${valStr}</span></div>`;
             }
-            for (const [stat, val] of Object.entries(extraStats)) {
+            for (const [stat, val] of Object.entries(res.extraStats)) {
                 if(val > 0) extraHTML += `<div style="color:var(--text-muted); font-size:0.9em; display:flex; justify-content:space-between; margin-bottom:4px;"><span>${stat}:</span> <span style="color:var(--accent); font-weight:bold;">+${val}</span></div>`;
             }
             $('extra-bonuses').innerHTML = extraHTML;
 
-            // Legendary Display Dynamic (FIXED)
+            // Legendary
             let legHTML = "";
-            if (leg["Cast Speed"] > 0) legHTML += `<div class="raw-row"><span>Cast Spd:</span> <span style="color:var(--accent)">+${leg["Cast Speed"]}%</span></div>`;
-            if (leg["Attack Speed"] > 0) legHTML += `<div class="raw-row"><span>Atk Spd:</span> <span style="color:var(--accent)">+${leg["Attack Speed"]}%</span></div>`;
+            if (res.leg["Cast Speed"] > 0) legHTML += `<div class="raw-row"><span>Cast Spd:</span> <span style="color:var(--accent)">+${res.leg["Cast Speed"]}%</span></div>`;
+            if (res.leg["Attack Speed"] > 0) legHTML += `<div class="raw-row"><span>Atk Spd:</span> <span style="color:var(--accent)">+${res.leg["Attack Speed"]}%</span></div>`;
             $('legendary-summary').innerHTML = legHTML;
             $('legendary-summary').style.display = legHTML ? 'block' : 'none';
         }
     };
 
-    // --- OPTIMIZER ---
+    // --- OPTIMIZER (REWRITTEN FOR STABILITY & SPEED) ---
     const optimizer = {
+        cloneLayout: (l) => {
+            // Much faster than JSON.parse(JSON.stringify)
+            const newGear = new Array(l.gear.length);
+            for(let i=0; i<l.gear.length; i++) {
+                if(l.gear[i]) newGear[i] = { ...l.gear[i] };
+                else newGear[i] = null;
+            }
+            const newImg = l.img.map(x => ({...x}));
+            return { gear: newGear, img: newImg };
+        },
+
         run: () => {
             const targets = {
                 v: parseFloat($('opt-vers').value)||0, m: parseFloat($('opt-mast').value)||0,
                 h: parseFloat($('opt-haste').value)||0, c: parseFloat($('opt-crit').value)||0, l: parseFloat($('opt-luck').value)||0
             };
-            const ctx = {
-                bV: parseFloat($('base-vers').value)||0, bM: parseFloat($('base-mast').value)||0,
-                bH: (parseFloat($('base-haste').value)||0) + ((parseFloat($('opt-agi').value)||0)*0.45),
-                bC: parseFloat($('base-crit').value)||0, bL: parseFloat($('base-luck').value)||0,
-                spec: $('class-spec').value, bonus: GAME_DATA.RAID_BONUS[$('class-spec').value]
+            const baseStats = {
+                v: parseFloat($('base-vers').value)||0,
+                m: parseFloat($('base-mast').value)||0,
+                h: parseFloat($('base-haste').value)||0,
+                c: parseFloat($('base-crit').value)||0,
+                l: parseFloat($('base-luck').value)||0,
+                agi: parseFloat($('opt-agi').value)||0 // Use opt input for Agi in simulator
             };
             
+            const spec = $('class-spec').value;
             const keep = $('opt-keep-selected').checked;
             const optImg = $('opt-optimize-imagine').checked;
             const unlimRaid = $('opt-unlimited-raid').checked;
             const build = logic.getBuild();
-            const specStats = GAME_DATA.SPECS[ctx.spec];
+            const specStats = GAME_DATA.SPECS[spec];
+            const currentLayout = logic.getLayoutFromUI();
 
             $('opt-status').innerText = "Simulating...";
-            if(!keep) GAME_DATA.SLOTS.forEach((_,i) => { if($(`raid-${i}`)) $(`raid-${i}`).checked = false; });
-
+            
+            // Use setTimeout to allow UI to render the "Simulating" text before freezing calculation
             setTimeout(() => {
                 let best = { layout: null, diff: Infinity };
-                for(let r=0; r<15; r++) {
-                    let layout = optimizer.genLayout(build, specStats, keep, optImg, unlimRaid);
-                    let diff = optimizer.getDiff(optimizer.calc(layout, ctx), targets);
-                    for(let i=0; i<1200; i++) {
-                        let mut = JSON.parse(JSON.stringify(layout));
-                        optimizer.mutate(mut, build, optImg);
-                        let d = optimizer.getDiff(optimizer.calc(mut, ctx), targets);
+                
+                // Increased iterations because logic is faster now
+                const POPULATION = 30;
+                const GENERATIONS = 300; 
+
+                for(let r=0; r < POPULATION; r++) {
+                    let layout = optimizer.genLayout(build, specStats, keep, optImg, unlimRaid, currentLayout);
+                    let diff = optimizer.calcDiff(layout, spec, baseStats, targets);
+                    
+                    for(let i=0; i < GENERATIONS; i++) {
+                        let mut = optimizer.cloneLayout(layout);
+                        optimizer.mutate(mut, build, optImg, specStats);
+                        let d = optimizer.calcDiff(mut, spec, baseStats, targets);
+                        
                         if(d < diff) { layout = mut; diff = d; }
                     }
                     if(diff < best.diff) best = { layout: layout, diff: diff };
                 }
+                
                 optimizer.apply(best.layout);
-                $('opt-status').innerText = "Done!";
+                $('opt-status').innerText = `Done! Diff: ${best.diff.toFixed(2)}`;
                 ui.switchTab('planner');
                 logic.calculate();
             }, 50);
         },
-        calc: (layout, ctx) => {
-            let raw = { Versatility: ctx.bV, Mastery: ctx.bM, Haste: ctx.bH, Crit: ctx.bC, Luck: ctx.bL };
-            layout.img.forEach(im => { 
-                const data = GAME_DATA.IMAGINE.OPTIONS[im.key];
-                if(data) raw[data.stat] += data.vals[im.idx];
-            });
-            layout.gear.forEach((g, i) => {
-                if(!g) return;
-                let vals = (i===0 && g.raid) ? GAME_DATA.VALUES.WEAPON_RAID : (i===0) ? GAME_DATA.VALUES.WEAPON_STD : g.raid ? GAME_DATA.VALUES.ARMOR_RAID : GAME_DATA.VALUES.ARMOR_STD;
-                if(g.p) raw[g.p] += vals.p; if(g.s) raw[g.s] += vals.s; if(g.r) raw[g.r] += vals.r;
-            });
-            if(layout.gear[0].raid && ctx.bonus && ctx.bonus.t === 'p') {
-                if(ctx.bonus.l === "Luck") raw.Luck *= (1 + ctx.bonus.v/100);
-                if(ctx.bonus.l.includes("Shield")) raw.Versatility *= (1 + ctx.bonus.v/100);
-            }
-            // Uses Curve Logic for Optimizer
-            return {
-                v: logic.getStatPercent("Versatility", raw.Versatility),
-                m: logic.getStatPercent("Mastery", raw.Mastery),
-                h: logic.getStatPercent("Haste", raw.Haste),
-                c: logic.getStatPercent("Crit", raw.Crit),
-                l: logic.getStatPercent("Luck", raw.Luck)
+
+        calcDiff: (layout, spec, base, targets) => {
+            // Internal calculation only returns RAW totals
+            const res = logic.calculateStatsInternal(layout, spec, base);
+            
+            // Convert to percentages using curve
+            const p = {
+                v: logic.getStatPercent("Versatility", res.total.Versatility),
+                m: logic.getStatPercent("Mastery", res.total.Mastery),
+                h: logic.getStatPercent("Haste", res.total.Haste),
+                c: logic.getStatPercent("Crit", res.total.Crit),
+                l: logic.getStatPercent("Luck", res.total.Luck)
             };
+            
+            return Math.abs(p.v-targets.v) + Math.abs(p.m-targets.m) + Math.abs(p.h-targets.h) + Math.abs(p.c-targets.c) + Math.abs(p.l-targets.l);
         },
-        getDiff: (s, t) => Math.abs(s.v-t.v) + Math.abs(s.m-t.m) + Math.abs(s.h-t.h) + Math.abs(s.c-t.c) + Math.abs(s.l-t.l),
-        genLayout: (build, specStats, keep, optImg, unlim) => {
+
+        genLayout: (build, specStats, keep, optImg, unlim, currentUI) => {
             let layout = { gear: [], img: [] };
             let locked = [], raidCnt = 0;
+
             if(keep) {
-                GAME_DATA.SLOTS.forEach((_, i) => {
-                    let s1 = $(`s1-${i}`).value;
-                    if(s1) {
-                        let isRaid = $(`raid-${i}`)?.checked;
-                        layout.gear.push({ raid: isRaid, p: s1, s: $(`s2-${i}`).value, r: $(`s3-${i}`).value, locked: true });
-                        locked.push(i); if(isRaid) raidCnt++;
-                    } else layout.gear.push(null);
+                currentUI.gear.forEach((g, i) => {
+                    if(g.p && g.p !== "-") {
+                        layout.gear.push({ ...g, locked: true });
+                        locked.push(i);
+                        if(g.raid) raidCnt++;
+                    } else {
+                        layout.gear.push(null);
+                    }
                 });
-            } else GAME_DATA.SLOTS.forEach(() => layout.gear.push(null));
+            } else {
+                GAME_DATA.SLOTS.forEach(() => layout.gear.push(null));
+            }
 
             let empty = GAME_DATA.SLOTS.map((_, i) => i).filter(i => !locked.includes(i));
-            let wpRaid = (!locked.includes(0)) ? true : (layout.gear[0]?.raid);
-            let armorIdx = [1,2,3,4,8,9], needed = Math.max(0, (unlim?5:4) - locked.filter(i=>armorIdx.includes(i) && layout.gear[i].raid).length);
-            let raidPicks = empty.filter(i=>armorIdx.includes(i)).sort(()=>Math.random()-0.5).slice(0, needed);
-            if(!locked.includes(0) && wpRaid) raidPicks.push(0);
+            
+            // Determine Raid Slots logic
+            // 4 Raid Armors max usually, unless unlimited
+            let armorIdx = [1,2,3,4,8,9]; // Armor + Accessories
+            let maxRaid = unlim ? 6 : 4;
+            let currentRaidCount = locked.filter(i => armorIdx.includes(i) && layout.gear[i].raid).length;
+            let needed = Math.max(0, maxRaid - currentRaidCount);
+            
+            // Pick random slots for Raid gear
+            let potentialRaidSlots = empty.filter(i => GAME_DATA.RAID_SLOTS.includes(GAME_DATA.SLOTS[i]));
+            let raidPicks = potentialRaidSlots.sort(() => Math.random() - 0.5).slice(0, needed);
+            
+            // Always try to raid weapon if not locked
+            if(!locked.includes(0)) raidPicks.push(0);
 
             empty.forEach(i => {
                 let isRaid = raidPicks.includes(i);
-                let p, s, r = (GAME_DATA.SLOTS[i]==="Weapon" && isRaid) ? "" : GAME_DATA.STATS[Math.floor(Math.random()*5)];
-                if(isRaid) { p = specStats[0]; s = specStats[1]; }
-                else {
+                let p, s, r = "";
+                
+                if(isRaid) {
+                    p = specStats[0]; s = specStats[1];
+                    // Raid armor has reforge, weapon doesn't
+                    if(GAME_DATA.SLOTS[i] !== "Weapon") {
+                         r = GAME_DATA.STATS[Math.floor(Math.random()*5)];
+                    }
+                } else {
                     let banned = GAME_DATA.RESTRICTIONS[GAME_DATA.SLOTS[i]]?.[build] || [];
                     let av = GAME_DATA.STATS.filter(st => !banned.includes(st));
                     p = av[Math.floor(Math.random()*av.length)];
-                    s = av.filter(x=>x!==p)[Math.floor(Math.random()*(av.length-1))];
+                    s = av.filter(x=>x!==p)[Math.floor(Math.random()*(av.length-1))]; // Ensure P != S
+                    r = GAME_DATA.STATS[Math.floor(Math.random()*5)];
                 }
-                layout.gear[i] = { raid: isRaid, p, s, r, locked: false };
+
+                // Preserve sigil info from UI if exists, else blank for now (Optimizer focuses on Gear Stats)
+                const sigName = ""; 
+                const sigLvl = "1";
+
+                layout.gear[i] = { raid: isRaid, p, s, r, sigName, sigLvl, locked: false };
             });
             
             const keys = Object.keys(GAME_DATA.IMAGINE.OPTIONS);
@@ -721,43 +829,70 @@
                     idx: Math.floor(Math.random()*6) 
                 }));
             } else {
-                layout.img = GAME_DATA.IMAGINE.SLOT_IDS.map(n => ({ 
-                    key: $(`img-type-${n}`).value, 
-                    idx: parseInt($(`img-lvl-${n}`).value)||0 
-                }));
+                layout.img = currentUI.img.map(x => ({...x}));
             }
             return layout;
         },
-        mutate: (l, build, optImg) => {
+
+        mutate: (l, build, optImg, specStats) => {
+            // Pick a random gear slot
             let idx = Math.floor(Math.random() * l.gear.length);
             let g = l.gear[idx];
-            if(g.locked && !g.raid) return;
+            
+            if (!g) return;
+            if (g.locked) return; // Cannot mutate locked gear
+            
+            // If Raid, can only mutate Reforge (if not weapon)
+            if (g.raid) {
+                if (GAME_DATA.SLOTS[idx] !== "Weapon") {
+                    g.r = GAME_DATA.STATS[Math.floor(Math.random()*5)];
+                }
+                return;
+            }
+
+            // If Standard, mutate P, S or R
             let aspect = Math.floor(Math.random() * 3); 
-            if(g.raid) return; 
             if(aspect === 0) { 
                 let banned = GAME_DATA.RESTRICTIONS[GAME_DATA.SLOTS[idx]]?.[build] || [];
                 let av = GAME_DATA.STATS.filter(st => !banned.includes(st));
-                g.p = av[Math.floor(Math.random()*av.length)]; if(g.p===g.s) g.s = av.filter(x=>x!==g.p)[0];
+                g.p = av[Math.floor(Math.random()*av.length)]; 
+                // Fix S if P became same as S
+                if(g.p === g.s) {
+                     let avS = av.filter(x => x !== g.p);
+                     if(avS.length > 0) g.s = avS[0];
+                }
             } else if (aspect === 1) {
                 let banned = GAME_DATA.RESTRICTIONS[GAME_DATA.SLOTS[idx]]?.[build] || [];
                 let av = GAME_DATA.STATS.filter(st => !banned.includes(st));
-                g.s = av.filter(x=>x!==g.p)[Math.floor(Math.random()*(av.length-1))];
+                let possibleS = av.filter(x => x !== g.p);
+                if (possibleS.length > 0) {
+                    g.s = possibleS[Math.floor(Math.random() * possibleS.length)];
+                }
             } else if (aspect === 2) {
-                if(!(idx===0 && g.raid)) g.r = GAME_DATA.STATS[Math.floor(Math.random()*5)];
+                g.r = GAME_DATA.STATS[Math.floor(Math.random()*5)];
             }
-            if(optImg && Math.random() < 0.1) {
+            
+            if(optImg && Math.random() < 0.15) {
                 const keys = Object.keys(GAME_DATA.IMAGINE.OPTIONS);
                 let im = l.img[Math.floor(Math.random()*l.img.length)];
                 if(Math.random()<0.5) im.key = keys[Math.floor(Math.random()*keys.length)];
                 else im.idx = Math.floor(Math.random()*6);
             }
         },
+
         apply: (l) => {
             l.gear.forEach((g, i) => {
-                if($(`raid-${i}`)) { $(`raid-${i}`).checked = g.raid; ui.toggleRaid(i); }
-                $(`s1-${i}`).value = g.p; logic.updateRow(i);
-                $(`s2-${i}`).value = g.s; $(`s3-${i}`).value = g.r;
+                if(!g) return;
+                const raidBox = $(`raid-${i}`);
+                if(raidBox) { 
+                    raidBox.checked = g.raid; 
+                    ui.toggleRaid(i); // This handles disabling fields
+                }
+                $(`s1-${i}`).value = g.p; logic.updateRow(i); // Update row to fix S options if needed
+                $(`s2-${i}`).value = g.s; 
+                if(!$(`s3-${i}`).disabled) $(`s3-${i}`).value = g.r;
             });
+            
             if(l.img.length) {
                 l.img.forEach((im, i) => {
                     const n = GAME_DATA.IMAGINE.SLOT_IDS[i];
